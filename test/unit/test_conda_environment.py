@@ -20,6 +20,11 @@ def conda_environment():
 
 @pytest.fixture
 def make_step():
+    class _Step:
+        def __init__(self, decorators):
+            self.name = "start"
+            self.decorators = decorators
+
     def _make(pypi_packages):
         conda_decorator = types.SimpleNamespace(
             name="conda",
@@ -39,10 +44,7 @@ def make_step():
             },
             supports_conda_environment=False,
         )
-        return types.SimpleNamespace(
-            name="start",
-            decorators=[conda_decorator, pypi_decorator],
-        )
+        return _Step([conda_decorator, pypi_decorator])
 
     return _make
 
