@@ -25,7 +25,7 @@ def make_step():
             self.name = "start"
             self.decorators = decorators
 
-    def _make(pypi_packages, conda_packages=None):
+    def _make(pypi_packages, conda_packages=None, include_pypi=True):
         conda_decorator = types.SimpleNamespace(
             name="conda",
             attributes={
@@ -35,16 +35,20 @@ def make_step():
             },
             supports_conda_environment=False,
         )
-        pypi_decorator = types.SimpleNamespace(
-            name="pypi",
-            attributes={
-                "packages": pypi_packages,
-                "python": None,
-                "disabled": False,
-            },
-            supports_conda_environment=False,
-        )
-        return _Step([conda_decorator, pypi_decorator])
+        decorators = [conda_decorator]
+        if include_pypi:
+            decorators.append(
+                types.SimpleNamespace(
+                    name="pypi",
+                    attributes={
+                        "packages": pypi_packages,
+                        "python": None,
+                        "disabled": False,
+                    },
+                    supports_conda_environment=False,
+                )
+            )
+        return _Step(decorators)
 
     return _make
 
@@ -105,8 +109,9 @@ def test_keyring_alias_is_normalized_for_conda_packages(
 ):
     mocker.patch("metaflow.plugins.pypi.conda_environment.os.getenv", return_value=None)
     step = make_step(
-        {"demo": "1.0.0"},
+        {},
         conda_packages={package_name: ">=1.1.1"},
+        include_pypi=False,
     )
 
     environment = conda_environment.get_environment(step)
