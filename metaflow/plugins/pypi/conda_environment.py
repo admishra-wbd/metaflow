@@ -34,6 +34,8 @@ class CondaEnvironment(MetaflowEnvironment):
     TYPE = "conda"
     _filecache = None
     _force_rebuild = False
+    _keyring_alias = "keyrings.google-artifactregistry"
+    _keyring_package = "keyrings.google-artifactregistry-auth"
 
     def __init__(self, flow):
         super().__init__(flow)
@@ -325,6 +327,31 @@ class CondaEnvironment(MetaflowEnvironment):
                 return str(disabled).lower() == "true"
         return False
 
+    @classmethod
+    def _canonicalize_conda_package_name(cls, package_name):
+        channel, sep, name = package_name.rpartition("::")
+        if name == cls._keyring_alias:
+            name = cls._keyring_package
+        return f"{channel}{sep}{name}" if sep else name
+
+    @classmethod
+    def _merge_package_specs(cls, existing, incoming):
+        if not existing:
+            return incoming
+        if not incoming or incoming == existing:
+            return existing
+        return ",".join([existing, incoming])
+
+    @classmethod
+    def _normalize_package_aliases(cls, packages):
+        normalized = {}
+        for package, spec in packages.items():
+            canonical = cls._canonicalize_conda_package_name(package)
+            normalized[canonical] = cls._merge_package_specs(
+                normalized.get(canonical, ""), spec
+            )
+        return normalized
+
     @functools.lru_cache(maxsize=None)
     def get_environment(self, step):
         environment = {}
@@ -341,6 +368,13 @@ class CondaEnvironment(MetaflowEnvironment):
                     }
                 else:
                     return {}
+        for environment_type in ("conda", "pypi"):
+            if environment_type in environment:
+                environment[environment_type]["packages"] = (
+                    self._normalize_package_aliases(
+                        environment[environment_type]["packages"]
+                    )
+                )
         # Resolve conda environment for @pypi's Python, falling back on @conda's
         # Python
         env_python = (
@@ -415,7 +449,7 @@ class CondaEnvironment(MetaflowEnvironment):
                 # Ensure this dependency is resolvable even when users override
                 # global conda channels and omit conda-forge.
                 environment["conda"]["packages"][
-                    "conda-forge::keyrings.google-artifactregistry-auth"
+                    "conda-forge::%s" % self._keyring_package
                 ] = ">=1.1.1"
 
         # Z combinator for a recursive lambda
