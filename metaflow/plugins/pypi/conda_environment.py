@@ -412,8 +412,10 @@ class CondaEnvironment(MetaflowEnvironment):
             # demands that `keyrings.google-artifactregistry-auth` has to be installed
             # and available in the underlying python environment.
             if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+                # Ensure this dependency is resolvable even when users override
+                # global conda channels and omit conda-forge.
                 environment["conda"]["packages"][
-                    "keyrings.google-artifactregistry-auth"
+                    "conda-forge::keyrings.google-artifactregistry-auth"
                 ] = ">=1.1.1"
 
         # Z combinator for a recursive lambda
